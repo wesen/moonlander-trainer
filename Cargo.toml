@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 hidapi = { version = "2.0.2", features = ["macos-shared-device"] }
+rand = "0.8.5"
