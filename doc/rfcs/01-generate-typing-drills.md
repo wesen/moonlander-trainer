@@ -62,6 +62,19 @@ trait TypingPatternGenerator {
 This way, we can keep track of typos per pattern, and then iterate once we generate
 new patterns, to really home in on specific drills.
 
+### Recursive generators
+
+It should be possible to create recursive generators.
+Actually I think that might be a bad idea, or I would have to keep a count of the recursion
+and I don't feel like fighting the rust borrow checker right now by making generate() mutable.
+
+In general I realize how the effort of dealing with rust's strong checks makes me less willing
+to experiment. It makes prototyping harder, in ways that I think are not just related to my 
+inexperience with the language.
+
+Of course, the fact that I'm trying to program with a keyboard I'm not familiar with either
+and with a baseline of stress from the week doesn't help at all.
+
 ### Instantiating generators from a config file
 
 In the configuration file, we want to define generators,
