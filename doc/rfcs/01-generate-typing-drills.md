@@ -62,6 +62,16 @@ trait TypingPatternGenerator {
 This way, we can keep track of typos per pattern, and then iterate once we generate
 new patterns, to really home in on specific drills.
 
+### Instantiating generators from a config file
+
+In the configuration file, we want to define generators,
+but we also want to specify how to maybe create generator factories? So for example,
+method call factories, should we provide them with plugs for the symbol generate, the argument generators?
+
+Or is it better to just define those in code for now.
+
+I think we should keep them in code for now, and refine the factory approach next time.
+
 ### Probabilities
 
 Besides just creating a probabilities generator that gets a list of weights + other generator,

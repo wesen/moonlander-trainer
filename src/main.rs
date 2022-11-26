@@ -52,7 +52,7 @@ impl ListOfPatternsGenerator {
     fn new(
         name: &'static str,
         children: Vec<Rc<dyn TypingPatternGenerator>>,
-        config: HashMap<String, String>,
+        config: HashMap<&str, String>,
     ) -> Self {
         let delimiter = config
             .get("delimiter")
@@ -169,7 +169,7 @@ impl RepeatPatternGenerator {
     fn new(
         name: &'static str,
         child: Rc<dyn TypingPatternGenerator>,
-        config: HashMap<String, String>,
+        config: HashMap<&str, String>,
     ) -> Self {
         let count = config
             .get("count")
@@ -199,6 +199,79 @@ impl TypingPatternGenerator for RepeatPatternGenerator {
     fn generate(&self) -> TypingPattern {
         let mut generated_patterns: Vec<TypingPattern> = Vec::new();
         for _ in 0..self.count {
+            generated_patterns.push(self.pattern.generate());
+        }
+        let pattern: String = generated_patterns
+            .iter()
+            .map(|x| {
+                if self.camel_case_strings {
+                    uppercase_first_letter(&x.pattern)
+                } else {
+                    x.pattern.clone()
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(&self.delimiter);
+
+        TypingPattern {
+            name: self.name.clone(),
+            pattern,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RandomRepeatGenerator {
+    pub name: String,
+    pub pattern: Rc<dyn TypingPatternGenerator>,
+    pub min_count: u32,
+    pub max_count: u32,
+    pub delimiter: String,
+    pub camel_case_strings: bool,
+}
+
+impl RandomRepeatGenerator {
+    fn new(
+        name: &'static str,
+        child: Rc<dyn TypingPatternGenerator>,
+        config: HashMap<&str, String>,
+    ) -> Self {
+        let min_count = config
+            .get("min_count")
+            .unwrap_or(&String::from("2"))
+            .parse::<u32>()
+            .unwrap_or(1);
+        let max_count = config
+            .get("max_count")
+            .unwrap_or(&String::from("4"))
+            .parse::<u32>()
+            .unwrap_or(4);
+        let delimiter = config
+            .get("delimiter")
+            .unwrap_or(&String::from(" "))
+            .to_string();
+        let camel_case_strings = config
+            .get("camel_case_strings")
+            .unwrap_or(&String::from("false"))
+            .parse::<bool>()
+            .unwrap_or(false);
+        RandomRepeatGenerator {
+            name: name.to_string(),
+            pattern: child,
+            min_count,
+            max_count,
+            delimiter,
+            camel_case_strings,
+        }
+    }
+}
+
+impl TypingPatternGenerator for RandomRepeatGenerator {
+    fn generate(&self) -> TypingPattern {
+        let mut rng = thread_rng();
+        let count = rng.gen_range(self.min_count..self.max_count);
+        let mut generated_patterns: Vec<TypingPattern> = Vec::new();
+        for _ in 0..count {
             generated_patterns.push(self.pattern.generate());
         }
         let pattern: String = generated_patterns
@@ -261,6 +334,36 @@ impl TypingPatternGenerator for NumberPatternGenerator {
     }
 }
 
+fn create_method_call_generator(
+    name: &'static str,
+    method_name: Rc<dyn TypingPatternGenerator>,
+    open_paren: Rc<dyn TypingPatternGenerator>,
+    close_paren: Rc<dyn TypingPatternGenerator>,
+    argument: Rc<dyn TypingPatternGenerator>,
+    argument_delimiter: String,
+    min_arguments: u32,
+    max_arguments: u32,
+) -> Rc<dyn TypingPatternGenerator> {
+    return Rc::new(ListOfPatternsGenerator::new(
+        name,
+        vec![
+            method_name,
+            open_paren,
+            Rc::new(RandomRepeatGenerator::new(
+                "arguments",
+                argument,
+                HashMap::from([
+                    ("delimiter", argument_delimiter),
+                    ("min_count", min_arguments.to_string()),
+                    ("max_count", max_arguments.to_string()),
+                ]),
+            )),
+            close_paren,
+        ],
+        HashMap::from([("delimiter", String::from(""))]),
+    ));
+}
+
 fn main() {
     let number = Rc::new(NumberPatternGenerator::new("number", HashMap::new()));
     let list_of_numbers = Rc::new(ListOfPatternsGenerator::new(
@@ -271,10 +374,7 @@ fn main() {
     let repeat_numbers = RepeatPatternGenerator::new(
         "repeat_numbers",
         number.clone(),
-        HashMap::from([
-            ("count".to_string(), "3".to_string()),
-            ("delimiter".to_string(), "-".to_string()),
-        ]),
+        HashMap::from([("count", "3".to_string()), ("delimiter", "-".to_string())]),
     );
     let camel_cased_symbols = Rc::new(RepeatPatternGenerator::new(
         "camel_cased_symbols",
@@ -291,8 +391,8 @@ fn main() {
             ],
         )),
         HashMap::from([
-            ("delimiter".to_string(), "".to_string()),
-            ("camel_case_strings".to_string(), "true".to_string()),
+            ("delimiter", "".to_string()),
+            ("camel_case_strings", "true".to_string()),
         ]),
     ));
 
@@ -303,10 +403,7 @@ fn main() {
     let number_arguments = Rc::new(RepeatPatternGenerator::new(
         "arguments",
         list_of_numbers.clone(),
-        HashMap::from([
-            ("count".to_string(), "3".to_string()),
-            ("delimiter".to_string(), ", ".to_string()),
-        ]),
+        HashMap::from([("count", "3".to_string()), ("delimiter", ", ".to_string())]),
     ));
     let array_deref = Rc::new(ListOfPatternsGenerator::new(
         "array_deref",
@@ -316,18 +413,18 @@ fn main() {
             number.clone(),
             close_bracket.clone(),
         ],
-        HashMap::from([("delimiter".to_string(), "".to_string())]),
+        HashMap::from([("delimiter", "".to_string())]),
     ));
 
-    let method_call_generator = ListOfPatternsGenerator::new(
+    let method_call_generator = create_method_call_generator(
         "method_call",
-        vec![
-            camel_cased_symbols.clone(),
-            open_paren.clone(),
-            number_arguments.clone(),
-            close_paren.clone(),
-        ],
-        HashMap::from([("delimiter".to_string(), "".to_string())]),
+        camel_cased_symbols.clone(),
+        open_paren.clone(),
+        close_paren.clone(),
+        number_arguments.clone(),
+        ", ".to_string(),
+        0,
+        3,
     );
 
     // hid::hid::test_hidapi();
